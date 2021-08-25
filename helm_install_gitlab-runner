@@ -1,0 +1,1 @@
+helm upgrade --install --namespace=runners  gitlab-runner --set gitlabUrl=https://gitlab.sxl.bet,runnerRegistrationToken=nTHqGWGtBVjkgdCfxT2r,rbac.create=true  gitlab/gitlab-runner

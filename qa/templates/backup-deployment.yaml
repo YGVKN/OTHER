@@ -1,0 +1,100 @@
+#runner executor Kubernetes & Deploy - helm & tools ...
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-script
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: backup-pro-to-s3
+data:
+  backup-script.sh: |
+    #!/bin/bash
+    set -e;
+    echo "SetUp & more...";
+    export DEBIAN_FRONTEND=noninteractive;
+    apt update && apt install --no-install-recommends apt-utils less software-properties-common postgresql-client -yy;
+    rm /etc/localtime && ln -s /usr/share/zoneinfo/Europe/Moscow /etc/localtime && date;
+    cat /etc/*release* > /tmp/healthcheck && [ -s /tmp/healthcheck ]  && echo $? || true;
+    aws configure set aws_access_key_id     "$AWS_ACCESS_DEV";
+    aws configure set aws_secret_access_key "$AWS_SECRET_DEV";
+    aws configure set region                "$AWS_DEFAULT_REGION";
+    aws configure set output "json";
+    echo -e "\nTruncated new created db qa & more...";
+    export HOST_db="sbstage.c01osjtrw1vt.eu-central-1.rds.amazonaws.com";
+    export S3_DIR="awsqabucket/backupZ/";
+    cat <<EOF >> truncate.sql
+    DO \$\$ DECLARE
+          r RECORD;
+    BEGIN
+        FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = current_schema()) LOOP
+            EXECUTE 'TRUNCATE TABLE ' || quote_ident(r.tablename) || ' CASCADE';
+        END LOOP;
+    END \$\$;
+    EOF
+    echo -e "PS &... $(date)";
+    aws s3 ls s3://${S3_DIR};
+    LAST_BACKUP=`aws s3 ls s3://${S3_DIR} | awk '{print $4}' | sort | tail -n 1`;
+    echo -e "\nConclusion...";
+    echo $LAST_BACKUP;
+    psql -h ${HOST_db} -U sbstage -tAc "SELECT 1 FROM pg_user WHERE usename = 'qa'" | grep -q 1 ||  psql -h ${HOST_db} -U sbstage -c "CREATE ROLE qa LOGIN PASSWORD 'qaqaqa';"
+    #PGPASSWORD=qaqaqa; psql -h ${HOST_db} -U qa -d qa -c "\due+;";
+    #PGPASSWORD=qaqaqa; psql -U qa  -d qa -h ${HOST_db} -p 5432 -c "\dn+";
+
+    #PGPASSWORD=qaqaqa; aws  s3 cp s3://${S3_DIR}backup-2021-08-25-03-00-25.sql - | pg_restore -U qa  -d qa -h ${HOST_db} -p 5432 --clean --no-owner --role=qa;
+    #PGPASSWORD=qaqaqa; aws  s3 cp s3://${S3_DIR}${LAST_BACKUP} - | pg_restore -U qa  -d qa -h ${HOST_db} -p 5432 --clean --no-owner --role=qa;
+    #psql -U sbstage -h ${HOST_db} -p 5432 ############< -a -q -f truncate.sql;
+    du -sh  /var/lib/apt/lists/ && rm -rf /var/lib/apt/lists/*;
+    tail -f /dev/null 2>&1;
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backup-pro-to-s3
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: backup-pro-to-s3
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backup-pro-to-s3
+  template:
+    metadata:
+      labels:
+        app: backup-pro-to-s3
+    spec:
+      containers:
+      - name: backup-pro-to-s3
+        image: registry.gitlab.com/gitlab-org/cloud-deploy/aws-base:latest
+        env:
+        - name: AWS_DEFAULT_REGION
+          value: eu-central-1
+        - name: AWS_ACCESS_DEV
+          valueFrom:
+            secretKeyRef:
+              name: qa-secrets
+              key: aws_access_dev
+        - name: AWS_SECRET_DEV
+          valueFrom:
+            secretKeyRef:
+              name: qa-secrets
+              key: aws_secret_dev
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: qa-secrets
+              key: dev_db_pass
+        imagePullPolicy: IfNotPresent
+        command:
+          - /bin/backup-script.sh
+        volumeMounts:
+          - name: backup-script
+            mountPath: /bin/backup-script.sh
+            readOnly: true
+            subPath: backup-script.sh
+      volumes:
+        - name: backup-script
+          configMap:
+            defaultMode: 0700
+            name: backup-script
+...

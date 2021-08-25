@@ -1,0 +1,27 @@
+
+.qa-template:
+  script:
+    - echo "PREPARE...";
+    - pwd && whoami && ls && cat /etc/*release*
+    - apt update && apt install curl less apt-transport-https ca-certificates  software-properties-common -yy
+    - echo "INSTALL AWS CLI & KUBE Tool & more ..."
+    - rm /etc/localtime && ln -s /usr/share/zoneinfo/Europe/Moscow /etc/localtime && date
+    - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && chmod +x kubectl && mv ./kubectl /usr/local/bin && kubectl version --client
+    - curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+    - rm -rf ~/.aws
+    - aws configure set aws_access_key_id     "${AWS_ACCESS_KEY_ID_DEV}"
+    - aws configure set aws_secret_access_key "${AWS_SECRET_ACCESS_KEY_DEV}"
+    - aws configure set region "eu-central-1"
+    - aws configure set output "json"
+    - aws eks --region eu-central-1 update-kubeconfig --name sbstage
+    - kubectl get no -o  wide && kubectl cluster-info
+    - kubectl delete all --all -n qa && kubectl delete cm --all -n qa
+    - helm upgrade qa --values ./helm/qa/values.yaml --namespace=qa --wait --debug --install  ./helm/qa
+    - sleep 5 && kubectl get po,cm -n qa  -o wide
+      #    - echo "####################################"
+      #    - echo "RESTORE pro db & truncate db sbSTAGE &"
+  cache:
+    key: "$CI_COMMIT_REF_SLUG"
+    paths:
+      - ${CI_PROJECT_DIR}
+      - ${HOME}/.cache
