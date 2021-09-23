@@ -10,6 +10,7 @@ stages:
     - build-prod
     - deploy-prod
     - cover
+    - rolling
 
 include:
   - local: '.gitlab-ci/templates/.chunck.yml'
@@ -67,27 +68,16 @@ cover:
       #    - DIFF=$((($END - $START)/1000000))
   script:
     - echo "λ"
-    - apt update && apt install curl docker.io rsync net-tools dnsutils git -qq -yy > /dev/null 2>&1
+    - apt update && apt install curl rsync net-tools dnsutils git -qq -yy > /dev/null 2>&1
     - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.bred.team/devops/ci/
       #- ping https://vault.bred.team || true
-    - go mod tidy && go mod verify >/dev/null 2>&1
+    - go mod tidy && go mod verify
     - echo "APP_VERSION=$(cat ./cmd/$APP_NAME/version)" > ./cmd/$APP_NAME/version.env
     - go build -o ./cmd/$APP_NAME/bin/ -ldflags="-s -w -X main.gitCommit=$CI_COMMIT_SHORT_SHA -X main.gitBranch=$CI_COMMIT_BRANCH" ./cmd/$APP_NAME
-    - echo "###Docker###"
-    - ls -al $(which init)
-    - dpkg -l | grep systemd
-    - mkdir -p /etc/systemd/system/docker.service.d
-    - touch /etc/systemd/system/docker.service.d/startup_options.conf
-    - cat /etc/systemd/system/docker.service.d/startup_options.conf
-    - echo "[Service]\nExecStart=/usr/bin/dockerd -H fd:// -H tcp://0.0.0.0:2376" > /etc/systemd/system/docker.service.d/startup_options.conf
-    - systemctl daemon-reload
     - BRANCH_NAME=$(echo $CI_COMMIT_REF_NAME | awk -F "/" '{print $1}') && echo $BRANCH_NAME &&  TAG=$(echo $CI_COMMIT_REF_NAME) && echo $TAG
     - echo $CI_REGISTRY_IMAGE
     - echo $CI_JOB_TOKEN
     - echo $CI_REGISTRY
-      # docker login registry.bred.team
-      # docker build -t registry.bred.team/bre-back/core .
-       #docker push registry.bred.team/bre-back/core
     - "command -v ssh-agent >/dev/null || ( apt update && apt install openssh-client -qq -yy )"
     - eval $(ssh-agent -s)
     - mkdir -p ~/.ssh && chmod 400 ~/.ssh
@@ -98,30 +88,11 @@ cover:
     - ssh -tt swarm05-dev.bred.team -l eo '
       whoami && pwd && date;
       docker node ls;
-      docker stack deploy --with-registry-auth -c /docker-compose.yaml ygvkn;
-      ls -al /tmp;
+      docker stack deploy --with-registry-auth -c /tmp/docker-compose.yaml ygvkn;
+      docker service ls;
+      docker stack services --filter name=ygvkn_ygvkn
       '
-      #
-      #      docker node ls;
-      #      docker stack ls;
-      #      docker stack ls --format "{{.Name}}: {{.Services}}";
-      #      docker stack deploy --with-registry-auth -c /docker-compose.yaml ygvkn;
-
-
-
-
-
-      #- ssh -tt swarm05-dev.bred.team -l eo "whoami && pwd && ls -al && cat /etc/hosts"
-      #  needs:
-      #    - lint
-      #    - test
-      #    - pprof_debug
-      #  when: on_success
-      #  extends: '.chunck'
-      #  after_script:
-      #    - rm -rf /var/lib/apt/lists/*
-      #  environment:
-      #    name: dev
+      #unsupported Compose file version: 3.9
   cache:
     key: gopath
     paths:
@@ -131,6 +102,29 @@ cover:
     - /^feature.+$/
   tags:
     - server-side
+
+
+rolling:
+  stage: rolling
+  image: gcr.io/kaniko-project/executor:debug
+  services:
+    - docker:stable-dind
+    - alpine/helm
+    - node:latest
+    - golang
+  variables:
+    DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - echo "rolling..."
+    - node -v
+    - go version
+      #- echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" "$CI_REGISTRY" --password-stdin
+  only:
+    - /^feature.+$/
+  tags:
+    - server-side
+
 
 swagger:
     stage: swag
