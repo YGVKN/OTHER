@@ -1,40 +1,267 @@
-image: docker:19.03.15
-services:
-  - docker:19.03.15-dind
+stages:
+    - profiling
+    - swag
+    - lint
+    - test
+    - build
+    - deploy
+    - build-stage
+    - deploy-stage
+    - build-prod
+    - deploy-prod
+    - cover
+
+include:
+  - local: '.gitlab-ci/templates/.chunck.yml'
 
 variables:
-  DOCKER_DRIVER: overlay2
-  DOCKER_HOST: tcp://docker:2376
-  GIT_DEPTH: 10
-  #GIT_CLONE_PATH: $CI_BUILDS_DIR/$CI_CONCURRENT_ID/$CI_PROJECT_NAME
-  #Look at ERROR: Job failed: prepare AbstractExecutor: setting GIT_CLONE_PATH is not
-  #allowed, enable `custom_build_dir` feature ...
+    GOPATH: "/opt/gopath"
+    DOCKER_DRIVER: overlay2
+    GIT_DEPTH: 10
 
-
-  #Recommend
-  #docker pull ... || true
-  #docker build --rm --cache-from
-
-
-include: '.gitlab-ci/templates/.qa-template.yml'
-
-
-stages:
-  - QA
-
-
-QA:
-  stage: QA
-  image: registry.gitlab.com/gitlab-org/cloud-deploy/aws-base:latest
-  extends: .qa-template
-  when: manual
+pprof_debug:
+  stage: profiling
+  image: golang
   allow_failure: true
-  after_script:
-    - echo "TODO ..."
   environment:
     name: dev
+  script:
+    - apt update 2>/dev/null | grep packages | cut -d '.' -f 1 && apt install net-tools graphviz -yy
+    - go tool dist list | grep linux
+    - START=$(date +%s%N)
+    - cd ./profiling && go build -o pprof_debug -gcflags=all="-N -l -dwarflocationlists=true"
+    - END=$(date +%s%N)
+    - DIFF=$((($END - $START)/1000000))
+    - echo "It took $DIFF milliseconds."
+    - ./pprof_debug &
+    - netstat -an
+    - netstat -tulpn && wget -qO- 0.0.0.0:7777/debug/pprof/ > ./profile.html
+    - rm -rf /var/lib/apt/lists/*
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - ${CI_PROJECT_DIR}
+    policy: pull-push
+  artifacts:
+    paths:
+      - ./profile.html
+    expire_in: 1 week
   only:
-    - /^release.+$/
+    - /^feature.+$/
   tags:
-    - qa
+    - server-side
 
+
+cover:
+  stage: cover
+  image: golang
+  variables:
+    GOPATH: ${CI_PROJECT_DIR}/.go
+    VAR: "composition"
+    APP_NAME: "audit"
+    DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: ""
+      #    - START=$(date +%s%N)
+      #    - go install -gcflags=all="-N -l -dwarflocationlists=true" ./...
+      #    - END=$(date +%s%N)
+      #    - DIFF=$((($END - $START)/1000000))
+  script:
+    - echo "λ"
+    - apt update && apt install curl docker.io rsync net-tools dnsutils git -qq -yy > /dev/null 2>&1
+    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.bred.team/devops/ci/
+      #- ping https://vault.bred.team || true
+    - go mod tidy && go mod verify >/dev/null 2>&1
+    - echo "APP_VERSION=$(cat ./cmd/$APP_NAME/version)" > ./cmd/$APP_NAME/version.env
+    - go build -o ./cmd/$APP_NAME/bin/ -ldflags="-s -w -X main.gitCommit=$CI_COMMIT_SHORT_SHA -X main.gitBranch=$CI_COMMIT_BRANCH" ./cmd/$APP_NAME
+    - echo "###Docker###"
+    - ls -al $(which init)
+    - dpkg -l | grep systemd
+    - mkdir -p /etc/systemd/system/docker.service.d
+    - touch /etc/systemd/system/docker.service.d/startup_options.conf
+    - cat /etc/systemd/system/docker.service.d/startup_options.conf
+    - echo "[Service]\nExecStart=/usr/bin/dockerd -H fd:// -H tcp://0.0.0.0:2376" > /etc/systemd/system/docker.service.d/startup_options.conf
+    - systemctl daemon-reload
+    - BRANCH_NAME=$(echo $CI_COMMIT_REF_NAME | awk -F "/" '{print $1}') && echo $BRANCH_NAME &&  TAG=$(echo $CI_COMMIT_REF_NAME) && echo $TAG
+    - echo $CI_REGISTRY_IMAGE
+    - echo $CI_JOB_TOKEN
+    - echo $CI_REGISTRY
+      # docker login registry.bred.team
+      # docker build -t registry.bred.team/bre-back/core .
+       #docker push registry.bred.team/bre-back/core
+    - "command -v ssh-agent >/dev/null || ( apt update && apt install openssh-client -qq -yy )"
+    - eval $(ssh-agent -s)
+    - mkdir -p ~/.ssh && chmod 400 ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" | base64 --decode > ~/.ssh/id_rsa
+    - chmod 400 ~/.ssh/id_rsa
+    - ssh-keyscan -t ecdsa swarm05-dev.bred.team >> ~/.ssh/known_hosts
+    - rsync -avz -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" --progress ./docker-compose.yaml eo@swarm05-dev.bred.team:/tmp
+    - ssh -tt swarm05-dev.bred.team -l eo '
+      whoami && pwd && date;
+      docker node ls;
+      docker stack deploy --with-registry-auth -c /docker-compose.yaml ygvkn;
+      ls -al /tmp;
+      '
+      #
+      #      docker node ls;
+      #      docker stack ls;
+      #      docker stack ls --format "{{.Name}}: {{.Services}}";
+      #      docker stack deploy --with-registry-auth -c /docker-compose.yaml ygvkn;
+
+
+
+
+
+      #- ssh -tt swarm05-dev.bred.team -l eo "whoami && pwd && ls -al && cat /etc/hosts"
+      #  needs:
+      #    - lint
+      #    - test
+      #    - pprof_debug
+      #  when: on_success
+      #  extends: '.chunck'
+      #  after_script:
+      #    - rm -rf /var/lib/apt/lists/*
+      #  environment:
+      #    name: dev
+  cache:
+    key: gopath
+    paths:
+      - ${CI_PROJECT_DIR}/.go
+    policy: pull-push
+  only:
+    - /^feature.+$/
+  tags:
+    - server-side
+
+swagger:
+    stage: swag
+    tags:
+        - qa-runner
+    script:
+        - bash proto/compile-proto.sh
+        - redoc-cli bundle proto/unity.swagger.json
+        - cp redoc-static.html /var/www/swagger.bred.team/
+    when: always
+
+lint:
+    tags:
+        - qa-runner
+    script:
+        - cd $CI_PROJECT_DIR && ./scripts/lint.sh
+    allow_failure: false
+    when: on_success
+
+test:
+    tags:
+        - qa-runner
+    script:
+        - go test -bench=. ./components/...
+        - cd $CI_PROJECT_DIR && ./scripts/test.sh
+    allow_failure: false
+    when: on_success
+
+build:
+    stage: build
+    environment:
+        name: dev
+    only:
+        refs:
+            - develop
+    tags:
+        - qa-runner
+    script:
+        - echo $CI_PROJECT_NAME $CI_PROJECT_DIR && cd /opt/ci/ && git pull && cd projects/$CI_PROJECT_NAME && sudo ./build.sh $CI_PROJECT_DIR
+    allow_failure: false
+    needs:
+        - lint
+        - test
+    when: on_success
+build-stage:
+    stage: build-stage
+    environment:
+        name: stage
+    only:
+        refs:
+            - stage
+    tags:
+        - qa-runner
+    script:
+        - cd /opt/ci/ && git pull && cd projects/$CI_PROJECT_NAME && sudo ./build.sh $CI_PROJECT_DIR
+    allow_failure: false
+    needs:
+        - lint
+        - test
+    when: on_success
+
+build-prod:
+    stage: build-prod
+    environment:
+        name: prod
+    only:
+        refs:
+            - master
+    tags:
+        - qa-runner
+    script:
+        - cd /opt/ci/ && git pull && cd projects/$CI_PROJECT_NAME && sudo ./build.sh $CI_PROJECT_DIR
+    allow_failure: false
+    needs:
+        - lint
+        - test
+    when: on_success
+
+deploy-develop:
+    stage: deploy
+    environment:
+        name: dev
+        url: https://dev.bred.team
+    only:
+        refs:
+            - develop
+    tags:
+        - qa-runner
+    script:
+        - cd /opt/ci/ && git pull && cd projects/$CI_PROJECT_NAME && ./deploy.sh $CI_PROJECT_DIR
+        #- echo "Deploy disabled"
+        #- exit 1
+    allow_failure: false
+    needs:
+        - build
+    when: on_success
+# Stage
+deploy-stage:
+    stage: deploy-stage
+    environment:
+        name: stage
+        url: https://stage.bred.team
+    only:
+        refs:
+            - stage
+    tags:
+        - qa-runner
+    script:
+        - cd /opt/ci/ && git pull && cd projects/$CI_PROJECT_NAME && ./deploy.sh $CI_PROJECT_DIR
+        #- echo "Deploy disabled"
+        #- exit 1
+    allow_failure: false
+    needs:
+        - build-stage
+    when: on_success
+
+deploy-prod:
+    stage: deploy-prod
+    environment:
+        name: prod
+        url: https://prod.bred.team
+    only:
+        refs:
+            - master
+    tags:
+        - qa-runner
+    script:
+        - cd /opt/ci/ && git pull && cd projects/$CI_PROJECT_NAME && ./deploy.sh $CI_PROJECT_DIR
+       #- echo "Deploy disabled"
+       #- exit 1
+    allow_failure: false
+    needs:
+        - build-prod
+    when: on_success
