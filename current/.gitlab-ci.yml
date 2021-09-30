@@ -1,0 +1,154 @@
+stages:
+    - compile
+    - API
+    - QA
+    - build
+    - switch
+    - swag
+
+include:
+  - local: '.gitlab-ci/templates/.chunck.yml'
+
+variables:
+    GOPATH: ${CI_PROJECT_DIR}/.go
+    FF_NETWORK_PER_BUILD: "true"
+    FF_USE_NEW_SHELL_ESCAPE: "true"
+    FF_GITLAB_REGISTRY_HELPER_IMAGE: "true"
+    FF_USE_FASTZIP: "true"
+    FF_ENABLE_JOB_CLEANUP: "false"  #IF TRUE - Clean dir project
+    GIT_DEPTH: 10
+
+before_script:
+  - echo ${CI_ENVIRONMENT_NAME}
+    #  - echo "OTHER STUFF"
+    #  - echo $CI_DEFAULT_BRANCH
+    #  - echo $CI_REGISTRY_IMAGE
+    #  - echo $CI_BUILD_REF
+    #  - echo $CI_COMMIT_BRANCH
+    #  - echo $CI_ENVIRONMENT_SLUG
+    #  - echo $CI_PROJECT_URL
+    #  - echo $CI_COMMIT_BRANCH
+    #  - echo $CI_PIPELINE_URL
+
+cache: &shared_cache
+  key: shared_cache
+  paths:
+    - ${CI_PROJECT_DIR}/StateStore
+  policy: pull-push
+
+api:
+  stage: API
+  script:
+    - curl https://gitlab.bred.team/-/profile/personal_access_tokens?name=Example+Access+token&scopes=api,read_user,read_registry
+  only:
+    - /^feature.+$/
+  tags:
+    - server-side
+
+
+
+compile:
+  stage: compile
+  image: golang:latest
+  variables:
+    APP_SERVICE: "audit"
+      #CI_DEBUG_TRACE: "true"
+  script:
+    - apt update && apt install build-essential -qqy > /dev/null 2>&1
+    - mkdir -p StateStore
+    - go env GOPATH
+    - "(go mod tidy && go mod verify) > /dev/null 2>&1"
+    - echo   "APP_VERSION=$(cat ./cmd/$APP_SERVICE/version)" > ./cmd/$APP_SERVICE/version.env
+    - export "APP_VERSION=$(cat ./cmd/$APP_SERVICE/version)"
+    - echo $APP_VERSION
+    - echo "Compile..."
+      #- go install -gcflags=all="-N -l -dwarflocationlists=true" ./...
+      #- go install -ldflags="-s -w" ./...
+    - echo $GOPATH
+    - go install  ./...
+    - ls $GOPATH/bin && du -sh $GOPATH/bin
+      #- tar -cf - $GOPATH/bin/ | xz -9 -c - > binz.tar.xz
+    - tar -cf - $GOPATH/bin | xz -1 -c - > StateStore/binz.tar.xz
+    - ls -al StateStore
+    - du  -sh StateStore/binz.tar.xz
+     #tar -xvzf example.tar.gz -C {path}
+      #- go build -o ./cmd/$APP_SERVICE/bin/ -ldflags="-s -w -X main.gitCommit=$CI_COMMIT_SHORT_SHA -X main.gitBranch=$CI_COMMIT_BRANCH" ./cmd/$APP_SERVICE
+      #- go build -o ./binaries/ -ldflags="-s -w -X main.gitCommit=$CI_COMMIT_SHORT_SHA -X main.gitBranch=$CI_COMMIT_BRANCH" ./cmd/$APP_SERVICE
+    - du -sh /builds/bY6hdwd2/0/bre-back/core/.go/bin/ && ls -al /builds/bY6hdwd2/0/bre-back/core/.go/bin/
+    - ls StateStore
+  artifacts:
+    name: "sharing"
+    paths:
+      - StateStore/
+    expire_in: never
+    reports:
+      requirements: tmp/requirements.json
+      #parallel: 3
+  cache:
+    <<: *shared_cache
+    policy: pull
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  only:
+    - /^feature.+$/
+  tags:
+    - server-side
+      #
+      #qa:
+      #  stage: QA
+      #  script:
+      #    - echo "LINT"
+      #    - cd $CI_PROJECT_DIR && ./scripts/lint.sh
+      #    - echo "TEST"
+      #    - go test -bench=. ./components/...
+      #    - cd $CI_PROJECT_DIR && ./scripts/test.sh
+      #  allow_failure: false
+      #  when: on_success
+      #  tags:
+      #    - qa-runner
+
+
+build:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(echo -n ${CI_REGISTRY_USER}:${CI_REGISTRY_PASSWORD} | base64)\"}}}" > /kaniko/.docker/config.json
+  cache:
+    <<: *shared_cache
+    policy: pull
+  tags:
+    - kaniko
+
+switch:
+  stage: switch
+  script:
+    - apt update && apt install curl rsync net-tools dnsutils git -qqy > /dev/null 2>&1
+    - echo "# Conn to SWARM"
+    - "command -v ssh-agent >/dev/null || ( apt update && apt install openssh-client -qq -yy )"
+    - eval $(ssh-agent -s)
+    - mkdir -p ~/.ssh && chmod 400 ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" | base64 --decode > ~/.ssh/id_rsa
+    - chmod 400 ~/.ssh/id_rsa
+    - ssh-keyscan -t ecdsa swarm05-dev.bred.team >> ~/.ssh/known_hosts
+      #    - rsync -avz -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" --progress ./.dockerfiles/ eo@swarm05-dev.bred.team:~/.dockerfiles/
+      #    - rsync -avz -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" --progress  ./cmd/$APP_NAME/bin  eo@swarm05-dev.bred.team:~/arts
+    - ssh -tt swarm05-dev.bred.team -l eo '
+      whoami && pwd && ls -al && date;
+      docker node ls;
+      '
+      #unsupported Compose file version: 3.9
+      #docker stack deploy --with-registry-auth -c /tmp/docker-compose.yaml ygvkn;
+  cache:
+    <<: *shared_cache
+    policy: pull-push
+  only:
+    - /^feature.+$/
+  tags:
+    - server-side
+
