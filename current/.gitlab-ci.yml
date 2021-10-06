@@ -1,92 +1,110 @@
 stages:
     - compile
+    - rulez
     - API
-    - QA
     - build
-    - switch
-    - swag
+    - deploy
 
 include:
-  - local: '.gitlab-ci/templates/.chunck.yml'
+  - local: '.gitlab-ci/templates/.compile.yml'
+  - local: '.gitlab-ci/templates/.gitlab_api.yml'
+  - local: '.gitlab-ci/templates/.build.yml'
+  - local: '.gitlab-ci/templates/.deploy.yml'
 
 variables:
     GOPATH: ${CI_PROJECT_DIR}/.go
+    DOCKER_DRIVER: overlay2
     FF_NETWORK_PER_BUILD: "true"
     FF_USE_NEW_SHELL_ESCAPE: "true"
     FF_GITLAB_REGISTRY_HELPER_IMAGE: "true"
     FF_USE_FASTZIP: "true"
     FF_ENABLE_JOB_CLEANUP: "false"  #IF TRUE - Clean dir project
-    GIT_DEPTH: 10
+    GET_SOURCES_ATTEMPTS: 3
+    RESTORE_CACHE_ATTEMPTS: 3
+    ARTIFACT_DOWNLOAD_ATTEMPTS: 3
+    EXECUTOR_JOB_SECTION_ATTEMPTS: 3
+    TRANSFER_METER_FREQUENCY: "2s"
+    ARTIFACT_COMPRESSION_LEVEL: "fast"
+    CACHE_COMPRESSION_LEVEL: "fastest"
+    WHAT_IS_STAND: "${CI_COMMIT_BRANCH}-${CI_DEFAULT_BRANCH}"
+    GIT_DEPTH: "3"
+
 
 before_script:
-  - echo ${CI_ENVIRONMENT_NAME}
-    #  - echo "OTHER STUFF"
-    #  - echo $CI_DEFAULT_BRANCH
-    #  - echo $CI_REGISTRY_IMAGE
-    #  - echo $CI_BUILD_REF
-    #  - echo $CI_COMMIT_BRANCH
-    #  - echo $CI_ENVIRONMENT_SLUG
-    #  - echo $CI_PROJECT_URL
-    #  - echo $CI_COMMIT_BRANCH
-    #  - echo $CI_PIPELINE_URL
+  - echo -e "\e[31mRUN ... & Pain ... \e[0m"
+  - echo -e  "\e[31m& Checking Stand ... \e[0m"
+  - |
+    if [[ "$WHAT_IS_STAND" == *"dev"* ]]
+    then
+      echo "env DEV"
+      export WHAT_IS_STAND="dev"
+    elif [[ "$WHAT_IS_STAND" == *"ygvkn"* ]]
+    then
+      echo "YGVKN branch"
+    elif [[ "$WHAT_IS_STAND" == *"stage"* ]]
+    then
+      echo "env STAGE"
+      export WHAT_IS_STAND="stage"
+    else
+      echo "Else void"
+    fi
+  - env | grep WHAT
+  - echo $WHAT_IS_STAND
 
 cache: &shared_cache
   key: shared_cache
   paths:
-    - ${CI_PROJECT_DIR}/StateStore
+    - $GOPATH/bin/
   policy: pull-push
 
-api:
-  stage: API
+job:
+  stage: rulez
   script:
-    - curl https://gitlab.bred.team/-/profile/personal_access_tokens?name=Example+Access+token&scopes=api,read_user,read_registry
-  only:
-    - /^feature.+$/
+    - echo "This job ran on the $CI_COMMIT_BRANCH branch."
+  rules:
+    - if: $CI_COMMIT_BRANCH == "feature.ygvkn"
+      when: manual
+    - when: on_success
+  allow_failure: true
   tags:
     - server-side
 
+api:
+  stage: API
+  image: ubuntu
+  environment:
+    name: $WHAT_IS_STAND
+  extends: .gitlab_api
+  when: manual
+  allow_failure: true
+  only:
+    - /^feature.+$/
+    - /.+ygvkn.+$/
+    - "/^${WHAT_IS_STAND}_[0-9]+(?:.[0-9]+)+$/"
+  tags:
+    - server-side
 
 
 compile:
   stage: compile
   image: golang:latest
+  environment:
+    name: $WHAT_IS_STAND
   variables:
-    APP_SERVICE: "audit"
+    APP_SERVICE: "default"
       #CI_DEBUG_TRACE: "true"
-  script:
-    - apt update && apt install build-essential -qqy > /dev/null 2>&1
-    - mkdir -p StateStore
-    - go env GOPATH
-    - "(go mod tidy && go mod verify) > /dev/null 2>&1"
-    - echo   "APP_VERSION=$(cat ./cmd/$APP_SERVICE/version)" > ./cmd/$APP_SERVICE/version.env
-    - export "APP_VERSION=$(cat ./cmd/$APP_SERVICE/version)"
-    - echo $APP_VERSION
-    - echo "Compile..."
-      #- go install -gcflags=all="-N -l -dwarflocationlists=true" ./...
-      #- go install -ldflags="-s -w" ./...
-    - echo $GOPATH
-    - go install  ./...
-    - ls $GOPATH/bin && du -sh $GOPATH/bin
-      #- tar -cf - $GOPATH/bin/ | xz -9 -c - > binz.tar.xz
-    - tar -cf - $GOPATH/bin | xz -1 -c - > StateStore/binz.tar.xz
-    - ls -al StateStore
-    - du  -sh StateStore/binz.tar.xz
-     #tar -xvzf example.tar.gz -C {path}
-      #- go build -o ./cmd/$APP_SERVICE/bin/ -ldflags="-s -w -X main.gitCommit=$CI_COMMIT_SHORT_SHA -X main.gitBranch=$CI_COMMIT_BRANCH" ./cmd/$APP_SERVICE
-      #- go build -o ./binaries/ -ldflags="-s -w -X main.gitCommit=$CI_COMMIT_SHORT_SHA -X main.gitBranch=$CI_COMMIT_BRANCH" ./cmd/$APP_SERVICE
-    - du -sh /builds/bY6hdwd2/0/bre-back/core/.go/bin/ && ls -al /builds/bY6hdwd2/0/bre-back/core/.go/bin/
-    - ls StateStore
-  artifacts:
-    name: "sharing"
-    paths:
-      - StateStore/
-    expire_in: never
-    reports:
-      requirements: tmp/requirements.json
-      #parallel: 3
+  extends: .compile
   cache:
-    <<: *shared_cache
-    policy: pull
+    key: ${CI_COMMIT_REF_NAME}
+    paths:
+      - ${CI_PROJECT_DIR}/StateStore
+  artifacts:
+    name: "state"
+    paths:
+      - $CI_PROJECT_DIR/StateStore
+    expire_in: 8 mins
+  timeout: 8  minutes
+    #parallel: 3
   retry:
     max: 2
     when:
@@ -94,21 +112,10 @@ compile:
       - stuck_or_timeout_failure
   only:
     - /^feature.+$/
+    - /.+ygvkn.+$/
+    - "/^${WHAT_IS_STAND}_[0-9]+(?:.[0-9]+)+$/"
   tags:
     - server-side
-      #
-      #qa:
-      #  stage: QA
-      #  script:
-      #    - echo "LINT"
-      #    - cd $CI_PROJECT_DIR && ./scripts/lint.sh
-      #    - echo "TEST"
-      #    - go test -bench=. ./components/...
-      #    - cd $CI_PROJECT_DIR && ./scripts/test.sh
-      #  allow_failure: false
-      #  when: on_success
-      #  tags:
-      #    - qa-runner
 
 
 build:
@@ -116,39 +123,37 @@ build:
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]
-  script:
-    - mkdir -p /kaniko/.docker
-    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(echo -n ${CI_REGISTRY_USER}:${CI_REGISTRY_PASSWORD} | base64)\"}}}" > /kaniko/.docker/config.json
+  environment:
+    name: $WHAT_IS_STAND
+  extends: .build
   cache:
     <<: *shared_cache
+    paths:
+      - $CI_PROJECT_DIR/StateStore
     policy: pull
-  tags:
-    - kaniko
-
-switch:
-  stage: switch
-  script:
-    - apt update && apt install curl rsync net-tools dnsutils git -qqy > /dev/null 2>&1
-    - echo "# Conn to SWARM"
-    - "command -v ssh-agent >/dev/null || ( apt update && apt install openssh-client -qq -yy )"
-    - eval $(ssh-agent -s)
-    - mkdir -p ~/.ssh && chmod 400 ~/.ssh
-    - echo "$SSH_PRIVATE_KEY" | base64 --decode > ~/.ssh/id_rsa
-    - chmod 400 ~/.ssh/id_rsa
-    - ssh-keyscan -t ecdsa swarm05-dev.bred.team >> ~/.ssh/known_hosts
-      #    - rsync -avz -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" --progress ./.dockerfiles/ eo@swarm05-dev.bred.team:~/.dockerfiles/
-      #    - rsync -avz -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" --progress  ./cmd/$APP_NAME/bin  eo@swarm05-dev.bred.team:~/arts
-    - ssh -tt swarm05-dev.bred.team -l eo '
-      whoami && pwd && ls -al && date;
-      docker node ls;
-      '
-      #unsupported Compose file version: 3.9
-      #docker stack deploy --with-registry-auth -c /tmp/docker-compose.yaml ygvkn;
-  cache:
-    <<: *shared_cache
-    policy: pull-push
   only:
     - /^feature.+$/
+    - /.+ygvkn.+$/
+    - "/^${WHAT_IS_STAND}_[0-9]+(?:.[0-9]+)+$/"
   tags:
     - server-side
 
+deploy:
+  stage: deploy
+  image: docker:latest
+  environment:
+    name: $WHAT_IS_STAND
+  variables:
+    DOCKER_HOST: "unknown"
+    DOCKER_TLS_DIR: "$HOME/.docker"
+    DOCKER_TLS_VERIFY: 1
+    CHECK: "checkout"
+  extends: .deploy
+    #parallel: 3
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  tags:
+    - k8s

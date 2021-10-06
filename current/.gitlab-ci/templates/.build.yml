@@ -1,0 +1,11 @@
+.build:
+  script:
+    - export WHAT_IS_STAND=$(cat $CI_PROJECT_DIR/StateStore/Stand)
+    - env | grep WHAT
+    - echo $WHAT_IS_STAND
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(echo -n ${CI_REGISTRY_USER}:${CI_REGISTRY_PASSWORD} | base64)\"}}}" > /kaniko/.docker/config.json
+    - echo "Example build $CI_REGISTRY_IMAGE:$WHAT_IS_STAND-666-$CI_JOB_ID"
+      #- /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/.dockerfiles/Editor --destination $CI_REGISTRY_IMAGE:$WHAT_IS_STAND-0.0.1-$CI_JOB_ID --no-push
+      #    - /kaniko/executor --cache=true --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/.dockerfiles/BaseImage --destination $CI_REGISTRY_IMAGE:DEV-task_number-$CI_JOB_ID
+

@@ -1,0 +1,12 @@
+.gitlab_api:
+  script:
+    - |
+      apt update && apt install curl jq -qqy > /dev/null 2>&1;
+      curl -H "PRIVATE-TOKEN: $YGVKN" "https://gitlab.bred.team/api/v4/namespaces/" | jq -C;
+      curl -H "PRIVATE-TOKEN: $YGVKN" "https://gitlab.bred.team/api/v4/projects/24/jobs/artifacts/feature.ygvkn/raw/*artifact_path?job=API" | jq -C;
+      curl -X  DELETE -H "PRIVATE-TOKEN: $YGVKN" "https://gitlab.bred.team/api/v4/projects/24/jobs/:$CI_JOB_ID/artifacts" | jq -C;
+      curl -H "PRIVATE-TOKEN: $YGVKN" "https://gitlab.bred.team/api/v4/projects/24/registry/repositories?tags=true&tags_count=true" | jq -C;
+      echo "---"
+      curl -H "PRIVATE-TOKEN: $YGVKN" "https://gitlab.bred.team/api/v4/projects/24/registry/repositories/" | jq -C;
+      echo "---"
+

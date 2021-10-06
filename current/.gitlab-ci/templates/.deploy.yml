@@ -1,0 +1,31 @@
+.deploy:
+  script:
+    - echo $name
+    - |
+      if [ "$CI_COMMIT_BRANCH" == "master" ] && [ "$WHAT_IS_STAND" == "master" ]
+      then
+        echo "master branch ..."
+        export DOCKER_HOST="tcp://swarm05-prod.bred.team:2376"
+      elif [ "$CI_COMMIT_BRANCH" == "develop" ] && [ "$WHAT_IS_STAND" == "dev" ]
+      then
+        echo "develop"
+        export DOCKER_HOST="tcp://swarm05-dev.bred.team:2376"
+      elif [ "$CI_COMMIT_BRANCH" == "feature.ygvkn" ]
+      then
+        echo "feature"
+        export DOCKER_HOST="tcp://swarm05-dev.bred.team:2376"
+      elif [ "$CI_COMMIT_BRANCH" == "stage" ] && [ "$WHAT_IS_STAND" == "stage" ]
+      then
+        echo "Stage"
+        export DOCKER_HOST="tcp://swarm05-stage.bred.team:2376"
+      else
+        echo "else"
+      fi
+    - echo $DOCKER_HOST
+    - mkdir -p "$HOME/.docker"
+    - echo "$SWARM_CA"   > "$HOME/.docker/ca.pem"
+    - echo "$SWARM_CERT" > "$HOME/.docker/cert.pem"
+    - echo "$SWARM_KEY"  > "$HOME/.docker/key.pem"
+    - docker node ls && docker service ls && docker stack ls
+      #- stack deploy --with-registry-auth -c .swarm/core.yml  ygvkn
+
