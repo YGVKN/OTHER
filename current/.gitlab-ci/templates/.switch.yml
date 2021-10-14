@@ -1,0 +1,28 @@
+.switch:
+  script:
+    - echo -e "\e[5mThen ...  \e[95mDEPLOY_VARIABLE \e[35m$DEPLOY_VARIABLE & \e[5mWHAT_IS_STAND $WHAT_IS_STAND"
+    - echo -e "DOCKER_HOST \e[96m$DOCKER_HOST"
+    - |
+      if [ "$DEPLOY_VARIABLE" == "DEPLOY_TO_DEV" ] && [ "$WHAT_IS_STAND" == "dev" ]
+      then
+        echo "DEV  branch ... & env DEV"
+        export DOCKER_HOST="tcp://swarm05-dev.bred.team:2376"
+      elif [ "$DEPLOY_VARIABLE" == "DEPLOY_TO_STAGE" ] && [ "$WHAT_IS_STAND" == "stage" ]
+      then
+        echo "STAGE  branch ... & env STAGE"
+        export DOCKER_HOST="tcp://swarm05-stage.bred.team:2376"
+      elif [ "$DEPLOY_VARIABLE" == "DEPLOY_TO_PROD" ] && [ "$WHAT_IS_STAND" == "prod" ]
+      then
+        echo "Master/Main  branch ... & env PROD"
+        export DOCKER_HOST="tcp://swarm05-prod.bred.team:2376"
+      else
+        echo -e "\e[5mELSE ..."
+      fi
+    - echo  -e "\e[5mDOCKER_HOST \e[96m$DOCKER_HOST"
+    - mkdir -p "$HOME/.docker"
+    - echo "$SWARM_CA"   > "$HOME/.docker/ca.pem"
+    - echo "$SWARM_CERT" > "$HOME/.docker/cert.pem"
+    - echo "$SWARM_KEY"  > "$HOME/.docker/key.pem"
+    - docker node ls && docker service ls && docker stack ls
+    - docker stack deploy --with-registry-auth -c .swarm/core.yml  ygvkn
+

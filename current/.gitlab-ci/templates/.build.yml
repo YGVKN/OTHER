@@ -1,11 +1,31 @@
 .build:
   script:
-    - export WHAT_IS_STAND=$(cat $CI_PROJECT_DIR/StateStore/Stand)
+    - export WHAT_IS_STAND=$(cat $CI_PROJECT_DIR/StateStore/.env)
+    - export STACKLOG_PATH=/workspace/kaniko.slog
     - env | grep WHAT
-    - echo $WHAT_IS_STAND
+    - echo -e "\e[33m$WHAT_IS_STAND" && echo -e "\e[33m$STACKLOG_PATH"
     - mkdir -p /kaniko/.docker
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(echo -n ${CI_REGISTRY_USER}:${CI_REGISTRY_PASSWORD} | base64)\"}}}" > /kaniko/.docker/config.json
-    - echo "Example build $CI_REGISTRY_IMAGE:$WHAT_IS_STAND-666-$CI_JOB_ID"
-      #- /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/.dockerfiles/Editor --destination $CI_REGISTRY_IMAGE:$WHAT_IS_STAND-0.0.1-$CI_JOB_ID --no-push
-      #    - /kaniko/executor --cache=true --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/.dockerfiles/BaseImage --destination $CI_REGISTRY_IMAGE:DEV-task_number-$CI_JOB_ID
+    - echo -e "\e[33mExample   $CI_REGISTRY_IMAGE/name_service:$WHAT_IS_STAND-task_number-$CI_JOB_ID"
+    - |
+      for app in $(ls -p cmd  | grep -i '/')
+      do
+       service=$(echo $app | cut -d'/' -f1)
+       echo $service
+       name_ufl=$(echo $service | awk '{ print toupper( substr( $0, 1, 1 ) ) substr( $0, 2 ); }')
+       echo $name_ufl
+       /kaniko/executor \
+       --verbosity debug \
+       --snapshotMode=redo \
+       --context $CI_PROJECT_DIR \
+       --dockerfile $CI_PROJECT_DIR/.dockerfiles/Service$name_ufl.dockerfile \
+       --destination $CI_REGISTRY_IMAGE/$service:$WHAT_IS_STAND-task_number-$CI_JOB_ID \
+       --no-push || cat /workspace/kaniko.slog
+      done
+    #    - /kaniko/executor
+    #      --snapshotMode=redo
+    #      --cache=true
+    #      --context $CI_PROJECT_DIR
+    #      --dockerfile $CI_PROJECT_DIR/.dockerfiles/ServiceAudit.dockerfile
+    #      --destination $CI_REGISTRY_IMAGE/something:$WHAT_IS_STAND-task_number-$CI_JOB_ID --push-retry=3
 

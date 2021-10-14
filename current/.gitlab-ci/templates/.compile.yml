@@ -1,21 +1,22 @@
 .compile:
   script:
-    - echo -e "\e[31mThis is RUN ...\e[0m & ... \e[31m  compile..."
-    - apt update && apt install curl ruby jq build-essential -qqy > /dev/null 2>&1
-    - cat /etc/*release*
+    - echo -e "\e[31mRUN ...\e[0m & ... \e[31m  compile..."
+    - apt update && apt install curl figlet toilet ruby jq build-essential -qqy > /dev/null 2>&1
     - go env GOPATH
     - env | grep WHAT
-    - mkdir -p StateStore
+    - mkdir  -p StateStore
+    - figlet -w 100 -c bred.team
     - ruby -ryaml -rjson -e "puts YAML.load_file('versions.yml').to_json" > $CI_PROJECT_DIR/StateStore/versions.json && cat $CI_PROJECT_DIR/StateStore/versions.json | jq -C
       #- "(go mod tidy && go mod verify) > /dev/null 2>&1"
+
     - "(go mod tidy) > /dev/null 2>&1"
-    - echo "Compile..."
+    - echo -e "\e[33mCompile..."
     - go install -ldflags="-s -w -X main.env-stand=$WHAT_IS_STAND -X main.gitCommit=$CI_COMMIT_SHORT_SHA -X main.gitBranch=$CI_COMMIT_BRANCH" ./...
-    - cp -R $GOPATH/bin/* $CI_PROJECT_DIR/StateStore && echo $WHAT_IS_STAND > $CI_PROJECT_DIR/StateStore/Stand
+    - cp -R $GOPATH/bin/* $CI_PROJECT_DIR/StateStore && echo $WHAT_IS_STAND > $CI_PROJECT_DIR/StateStore/.env
     - export APPS_COUT=$(ls -al $CI_PROJECT_DIR/StateStore | wc -l)
+    - ls -al StateStore && du -sh StateStore && echo $APPS_COUT
     - |
       for app in $(cat $CI_PROJECT_DIR/StateStore/versions.json | jq '.apps | keys')
       do
-        echo $app
+        echo -e "\e[33m$app"
       done
-    -  cat "$CI_PROJECT_DIR/StateStore/versions.json" | jq '.apps | .[].version'

@@ -1,18 +1,21 @@
 stages:
-    - compile
-    - rulez
     - API
+    - compile
     - build
-    - deploy
+    - switch_and_deploy
 
 include:
   - local: '.gitlab-ci/templates/.compile.yml'
   - local: '.gitlab-ci/templates/.gitlab_api.yml'
+  - local: '.gitlab-ci/templates/.switch.yml'
   - local: '.gitlab-ci/templates/.build.yml'
-  - local: '.gitlab-ci/templates/.deploy.yml'
 
 variables:
     GOPATH: ${CI_PROJECT_DIR}/.go
+    GIT_DEPTH: 0
+    GIT_STRATEGY: fetch
+
+
     DOCKER_DRIVER: overlay2
     FF_NETWORK_PER_BUILD: "true"
     FF_USE_NEW_SHELL_ESCAPE: "true"
@@ -26,13 +29,19 @@ variables:
     TRANSFER_METER_FREQUENCY: "2s"
     ARTIFACT_COMPRESSION_LEVEL: "fast"
     CACHE_COMPRESSION_LEVEL: "fastest"
-    WHAT_IS_STAND: "${CI_COMMIT_BRANCH}-${CI_DEFAULT_BRANCH}"
-    GIT_DEPTH: "3"
+    WHAT_IS_STAND: "${CI_COMMIT_REF_NAME}-${CI_COMMIT_BRANCH}-${CI_DEFAULT_BRANCH}"
+    DEPLOY_VARIABLE: "Default"
+    DOCKER_TLS_DIR:  "$HOME/.docker"
+    DOCKER_TLS_VERIFY: 1
+    DOCKER_HOST: "unknown"
+    BUILD_DATE: "date +%Y-%m-%d-%H:%M:%S"
 
 
 before_script:
-  - echo -e "\e[31mRUN ... & Pain ... \e[0m"
-  - echo -e  "\e[31m& Checking Stand ... \e[0m"
+  - echo -e "\e[31mRUN ... & Pain ...& Detect Stand ...  \e[0m"
+  - echo -e "\e[1;35mDefault Values"
+  - echo -e "\e[35m$WHAT_IS_STAND | $DOCKER_HOST | $DEPLOY_VARIABLE"
+  - echo -e "\e[35m######################################################"
   - |
     if [[ "$WHAT_IS_STAND" == *"dev"* ]]
     then
@@ -45,65 +54,49 @@ before_script:
     then
       echo "env STAGE"
       export WHAT_IS_STAND="stage"
+    elif [[ "$WHAT_IS_STAND" == *"master"* ]]
+    then
+      echo "env MASTER/MAIN/PROD"
+      export WHAT_IS_STAND="prod"
     else
-      echo "Else void"
+      echo -e "\e[5mElse returns $WHAT_IS_STAND"
     fi
   - env | grep WHAT
-  - echo $WHAT_IS_STAND
+  - echo -e "\e[1;35m$WHAT_IS_STAND"
+  - echo -e "\e[35m######################################################"
 
 cache: &shared_cache
   key: shared_cache
   paths:
     - $GOPATH/bin/
+      #untracked: true
   policy: pull-push
 
-job:
-  stage: rulez
-  script:
-    - echo "This job ran on the $CI_COMMIT_BRANCH branch."
-  rules:
-    - if: $CI_COMMIT_BRANCH == "feature.ygvkn"
-      when: manual
-    - when: on_success
-  allow_failure: true
-  tags:
-    - server-side
 
 api:
   stage: API
-  image: ubuntu
-  environment:
-    name: $WHAT_IS_STAND
   extends: .gitlab_api
-  when: manual
-  allow_failure: true
-  only:
-    - /^feature.+$/
-    - /.+ygvkn.+$/
-    - "/^${WHAT_IS_STAND}_[0-9]+(?:.[0-9]+)+$/"
-  tags:
-    - server-side
 
 
 compile:
   stage: compile
   image: golang:latest
-  environment:
-    name: $WHAT_IS_STAND
   variables:
-    APP_SERVICE: "default"
+    APP_SERVICE: "Default"
       #CI_DEBUG_TRACE: "true"
   extends: .compile
   cache:
     key: ${CI_COMMIT_REF_NAME}
     paths:
       - ${CI_PROJECT_DIR}/StateStore
+    policy: pull
   artifacts:
     name: "state"
     paths:
       - $CI_PROJECT_DIR/StateStore
     expire_in: 8 mins
-  timeout: 8  minutes
+      #expire_in: 8 hour
+  timeout: 4  minutes
     #parallel: 3
   retry:
     max: 2
@@ -123,33 +116,51 @@ build:
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]
-  environment:
-    name: $WHAT_IS_STAND
+  needs:
+    - job: compile
+      artifacts: true
   extends: .build
   cache:
     <<: *shared_cache
     paths:
       - $CI_PROJECT_DIR/StateStore
     policy: pull
+  timeout: 8 minutes
   only:
     - /^feature.+$/
     - /.+ygvkn.+$/
     - "/^${WHAT_IS_STAND}_[0-9]+(?:.[0-9]+)+$/"
+      #when: manual
   tags:
     - server-side
 
-deploy:
-  stage: deploy
+#DEPLOY#
+switch_and_deploy:
+  stage: switch_and_deploy
   image: docker:latest
-  environment:
-    name: $WHAT_IS_STAND
+  services:
+    - docker:dind
   variables:
-    DOCKER_HOST: "unknown"
-    DOCKER_TLS_DIR: "$HOME/.docker"
-    DOCKER_TLS_VERIFY: 1
-    CHECK: "checkout"
-  extends: .deploy
-    #parallel: 3
+    CHECK: "check here..."
+  rules:
+    - if: $WHAT_IS_STAND == "dev"    || (($CI_COMMIT_REF_NAME  =~ /^DEV.*/    || $CI_COMMIT_BRANCH =~ /^feature.*/ ))
+      variables:
+        DEPLOY_VARIABLE: "DEPLOY_TO_DEV"
+    - if: $WHAT_IS_STAND == "stage"  || (($CI_COMMIT_REF_NAME  =~ /^stage.*/  || $CI_COMMIT_BRANCH =~ /^stage.*/ ))
+      variables:
+        DEPLOY_VARIABLE: "DEPLOY_TO_STAGE"
+    - if: $WHAT_IS_STAND == "prod"   || (($CI_COMMIT_REF_NAME  =~ /^master.*/ || $CI_COMMIT_BRANCH =~ /^master.*/ ))
+      variables:
+        DEPLOY_VARIABLE: "DEPLOY_TO_PROD"
+  extends: .switch
+  allow_failure: true
+  cache:
+    <<: *shared_cache
+    paths:
+      - $CI_PROJECT_DIR/StateStore
+    policy: pull
+  after_script:
+    - echo -e "\e[0;35m$CHECK"
   retry:
     max: 2
     when:
