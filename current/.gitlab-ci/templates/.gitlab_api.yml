@@ -1,15 +1,16 @@
-.gitlab_api:
+.api:
   image: ubuntu
   script:
+    - apt update && apt install curl figlet toilet ruby jq -qqy > /dev/null 2>&1
     - |
-      apt update && apt install curl jq -qqy > /dev/null 2>&1;
-      curl -H "PRIVATE-TOKEN: $YGVKN" "https://gitlab.bred.team/api/v4/namespaces/" | jq -C;
-      curl -H "PRIVATE-TOKEN: $YGVKN" "https://gitlab.bred.team/api/v4/projects/24/jobs/artifacts/feature.ygvkn/raw/*artifact_path?job=API" | jq -C;
-      curl -X  DELETE -H "PRIVATE-TOKEN: $YGVKN" "https://gitlab.bred.team/api/v4/projects/24/jobs/$CI_JOB_ID/artifacts" | jq -C;
-      curl -H "PRIVATE-TOKEN: $YGVKN" "https://gitlab.bred.team/api/v4/projects/24/registry/repositories?tags=true&tags_count=true" | jq -C;
-      echo "---"
-      curl -H "PRIVATE-TOKEN: $YGVKN" "https://gitlab.bred.team/api/v4/projects/24/registry/repositories/" | jq -C;
-      echo "---"
+      figlet -c  bred.team;
+      curl -H "PRIVATE-TOKEN: $YGVKN" \
+              "https://gitlab.bred.team/api/v4/projects/24/registry/repositories?tags=true&tags_count=true" | jq '.[].name';
+      figlet -c  bred.team;
+    - |
+      curl -sSL -H  "X-Vault-Token: $VAULT_TOKEN"  https://vault.bred.team/v1/bre-core/data/server-side/confz | jq -C -r '.data.data'
+    - >
+      echo "&..."
   when: manual
   allow_failure: true
   tags:

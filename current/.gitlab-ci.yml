@@ -1,6 +1,31 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+      variables:
+        DEPLOY_ENV: "prod"
+        WHAT_IS_STAND: "prod"
+        DEPLOY_VARIABLE: "DEPLOY_TO_PROD"
+    - if: $CI_COMMIT_BRANCH == "feature.ygvkn"
+      variables:
+        DEPLOY_ENV: dev
+        WHAT_IS_STAND: dev
+        DEPLOY_VARIABLE: DEPLOY_TO_DEV
+    - if: $CI_COMMIT_BRANCH =~ /^feature\.*$/i || $CI_COMMIT_BRANCH =~ /^dev\.*$/i
+      variables:
+        DEPLOY_ENV: "dev"
+        WHAT_IS_STAND: "dev"
+        DEPLOY_VARIABLE: "DEPLOY_TO_DEV"
+    - if: $CI_COMMIT_BRANCH == "stage"
+      variables:
+        DEPLOY_ENV: "stage"
+        WHAT_IS_STAND: "stage"
+        DEPLOY_VARIABLE: "DEPLOY_TO_STAGE"
+
 stages:
+    - Lint
     - API
     - compile
+    - Consul
     - build
     - switch_and_deploy
 
@@ -14,8 +39,6 @@ variables:
     GOPATH: ${CI_PROJECT_DIR}/.go
     GIT_DEPTH: 0
     GIT_STRATEGY: fetch
-
-
     DOCKER_DRIVER: overlay2
     FF_NETWORK_PER_BUILD: "true"
     FF_USE_NEW_SHELL_ESCAPE: "true"
@@ -29,7 +52,7 @@ variables:
     TRANSFER_METER_FREQUENCY: "2s"
     ARTIFACT_COMPRESSION_LEVEL: "fast"
     CACHE_COMPRESSION_LEVEL: "fastest"
-    WHAT_IS_STAND: "${CI_COMMIT_REF_NAME}-${CI_COMMIT_BRANCH}-${CI_DEFAULT_BRANCH}"
+    # WHAT_IS_STAND: "${CI_COMMIT_REF_NAME}-${CI_COMMIT_BRANCH}-${CI_DEFAULT_BRANCH}"
     DEPLOY_VARIABLE: "Default"
     DOCKER_TLS_DIR:  "$HOME/.docker"
     DOCKER_TLS_VERIFY: 1
@@ -37,45 +60,30 @@ variables:
     BUILD_DATE: "date +%Y-%m-%d-%H:%M:%S"
 
 
-before_script:
-  - echo -e "\e[31mRUN ... & Pain ...& Detect Stand ...  \e[0m"
-  - echo -e "\e[1;35mDefault Values"
-  - echo -e "\e[35m$WHAT_IS_STAND | $DOCKER_HOST | $DEPLOY_VARIABLE"
-  - echo -e "\e[35m######################################################"
-  - |
-    if [[ "$WHAT_IS_STAND" == *"dev"* ]]
-    then
-      echo "env DEV"
-      export WHAT_IS_STAND="dev"
-    elif [[ "$WHAT_IS_STAND" == *"ygvkn"* ]]
-    then
-      echo "YGVKN branch"
-    elif [[ "$WHAT_IS_STAND" == *"stage"* ]]
-    then
-      echo "env STAGE"
-      export WHAT_IS_STAND="stage"
-    elif [[ "$WHAT_IS_STAND" == *"master"* ]]
-    then
-      echo "env MASTER/MAIN/PROD"
-      export WHAT_IS_STAND="prod"
-    else
-      echo -e "\e[5mElse returns $WHAT_IS_STAND"
-    fi
-  - env | grep WHAT
-  - echo -e "\e[1;35m$WHAT_IS_STAND"
-  - echo -e "\e[35m######################################################"
-
 cache: &shared_cache
   key: shared_cache
   paths:
     - $GOPATH/bin/
+    - $CI_PROJECT_DIR/StateStore/
       #untracked: true
   policy: pull-push
 
 
-api:
+Lint:
+    stage: Lint
+    tags:
+        - qa-runner
+    script:
+        - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.31.0
+        - /opt/gopath/bin/golangci-lint --version
+        - cd $CI_PROJECT_DIR && ./scripts/lint.sh
+    allow_failure: false
+    when: on_success
+
+
+API:
   stage: API
-  extends: .gitlab_api
+  extends: .api
 
 
 compile:
@@ -97,6 +105,7 @@ compile:
     expire_in: 8 mins
       #expire_in: 8 hour
   timeout: 4  minutes
+    #  when: manual
     #parallel: 3
   retry:
     max: 2
@@ -106,13 +115,38 @@ compile:
   only:
     - /^feature.+$/
     - /.+ygvkn.+$/
-    - "/^${WHAT_IS_STAND}_[0-9]+(?:.[0-9]+)+$/"
+    - "/^${WHAT_IS_STAND}_[0-9]+(?:.[0-9]+)+$/i"
+  tags:
+    - server-side
+
+Consul:
+  stage: Consul
+  image: hashicorp/consul
+  needs:
+    job: compile
+    artifacts: true
+  script:
+    - apk add --no-cache --update curl jq
+    - |
+      curl http://consul01-office.bred.team:8500/v1/kv/ygvkn?raw | jq -C;
+      curl http://consul01-office.bred.team:8500/v1/kv/services/confz/audit?raw > StateStore/audit.yml;
+    - >
+      rm -rf /var/cache/apk/*
+  cache:
+    <<: *shared_cache
+    policy: pull
+  timeout: 8 minutes
+  only:
+    - /^feature.+$/
+    - /.+ygvkn.+$/
+    - "/^${WHAT_IS_STAND}_[0-9]+(?:.[0-9]+)+$/i"
   tags:
     - server-side
 
 
 build:
   stage: build
+    #image: registry.bred.team/bre-back/core/kaniko:ygvkn
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]
@@ -126,11 +160,11 @@ build:
       - $CI_PROJECT_DIR/StateStore
     policy: pull
   timeout: 8 minutes
+  when: manual
   only:
     - /^feature.+$/
     - /.+ygvkn.+$/
-    - "/^${WHAT_IS_STAND}_[0-9]+(?:.[0-9]+)+$/"
-      #when: manual
+    - "/^${WHAT_IS_STAND}_[0-9]+(?:.[0-9]+)+$/i"
   tags:
     - server-side
 
@@ -142,16 +176,7 @@ switch_and_deploy:
     - docker:dind
   variables:
     CHECK: "check here..."
-  rules:
-    - if: $WHAT_IS_STAND == "dev"    || (($CI_COMMIT_REF_NAME  =~ /^DEV.*/    || $CI_COMMIT_BRANCH =~ /^feature.*/ ))
-      variables:
-        DEPLOY_VARIABLE: "DEPLOY_TO_DEV"
-    - if: $WHAT_IS_STAND == "stage"  || (($CI_COMMIT_REF_NAME  =~ /^stage.*/  || $CI_COMMIT_BRANCH =~ /^stage.*/ ))
-      variables:
-        DEPLOY_VARIABLE: "DEPLOY_TO_STAGE"
-    - if: $WHAT_IS_STAND == "prod"   || (($CI_COMMIT_REF_NAME  =~ /^master.*/ || $CI_COMMIT_BRANCH =~ /^master.*/ ))
-      variables:
-        DEPLOY_VARIABLE: "DEPLOY_TO_PROD"
+    DOCKER_HOST: "tcp://swarm05-${WHAT_IS_STAND}.bred.team:2376"
   extends: .switch
   allow_failure: true
   cache:
@@ -166,5 +191,118 @@ switch_and_deploy:
     when:
       - runner_system_failure
       - stuck_or_timeout_failure
+  when: manual
   tags:
     - k8s
+
+      #build:
+      #    stage: build
+      #    environment:
+      #        name: dev
+      #    only:
+      #        refs:
+      #            - develop
+      #    tags:
+      #        - qa-runner
+      #    script:
+      #        - go version
+      #        - echo $CI_PROJECT_NAME $CI_PROJECT_DIR && cd /opt/ci/ && git pull && cd projects/$CI_PROJECT_NAME && sudo ./build.sh $CI_PROJECT_DIR
+      #    allow_failure: false
+      #    needs:
+      #        - lint
+      #        - test
+      #    when: on_success
+      #build-stage:
+      #    stage: build-stage
+      #    environment:
+      #        name: stage
+      #    only:
+      #        refs:
+      #            - stage
+      #    tags:
+      #        - qa-runner
+      #    script:
+      #        - cd /opt/ci/ && git pull && cd projects/$CI_PROJECT_NAME && sudo ./build.sh $CI_PROJECT_DIR
+      #    allow_failure: false
+      #    needs:
+      #        - lint
+      #        - test
+      #    when: on_success
+      #
+      #build-prod:
+      #    stage: build-prod
+      #    environment:
+      #        name: prod
+      #    only:
+      #        refs:
+      #            - master
+      #    tags:
+      #        - qa-runner
+      #    script:
+      #        - go version
+      #        - cd /opt/ci/ && git pull && cd projects/$CI_PROJECT_NAME && sudo ./build.sh $CI_PROJECT_DIR
+      #    allow_failure: false
+      #    needs:
+      #        - lint
+      #        - test
+      #    when: on_success
+      #
+      #deploy-develop:
+      #    stage: deploy
+      #    environment:
+      #        name: dev
+      #        url: https://dev.bred.team
+      #    only:
+      #        refs:
+      #            - develop
+      #    tags:
+      #        - qa-runner
+      #    script:
+      #        - go version
+      #        - cd /opt/ci/ && git pull && cd projects/$CI_PROJECT_NAME && ./deploy.sh $CI_PROJECT_DIR
+      #        #- echo "Deploy disabled"
+      #        #- exit 1
+      #    allow_failure: false
+      #    needs:
+      #        - build
+      #    when: on_success
+      ## Stage
+      #deploy-stage:
+      #    stage: deploy-stage
+      #    environment:
+      #        name: stage
+      #        url: https://stage.bred.team
+      #    only:
+      #        refs:
+      #            - stage
+      #    tags:
+      #        - qa-runner
+      #    script:
+      #        - go version
+      #        - cd /opt/ci/ && git pull && cd projects/$CI_PROJECT_NAME && ./deploy.sh $CI_PROJECT_DIR
+      #        #- echo "Deploy disabled"
+      #        #- exit 1
+      #    allow_failure: false
+      #    needs:
+      #        - build-stage
+      #    when: on_success
+      #
+      #deploy-prod:
+      #    stage: deploy-prod
+      #    environment:
+      #        name: prod
+      #        url: https://prod.bred.team
+      #    only:
+      #        refs:
+      #            - master
+      #    tags:
+      #        - qa-runner
+      #    script:
+      #        - go version
+      #        - cd /opt/ci/ && git pull && cd projects/$CI_PROJECT_NAME && ./deploy.sh $CI_PROJECT_DIR
+      #       #- echo "Deploy disabled"
+      #       #- exit 1
+      #    allow_failure: false
+      #    needs:
+      #        - build-prod
+      #    when: on_success
