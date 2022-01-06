@@ -1,0 +1,25 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: ygvkn-zhuzha
+spec:
+  acme:
+    email: denisyagovkin@mail.ru
+    preferredChain: ""
+    privateKeySecretRef:
+      name: ygvkn-zhuzha-account-key
+    server: https://acme-v02.api.letsencrypt.org/directory
+    solvers:
+    - dns01:
+        cloudDNS:
+          project: ygvkn-dns
+          serviceAccountSecretRef:
+            key: dns.json
+            name: google-dns-credentials-kotiki
+      selector:
+        dnsZones:
+        - ygvkn.io
+        - zhuzha.io
+        - '*.ygvkn.io'
+        - '*.zhuzha.io'
+

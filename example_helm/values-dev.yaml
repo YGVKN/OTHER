@@ -1,0 +1,12 @@
+camunda_namespace: dev
+environment: dev
+domain: dev.camunda.bred.team
+
+
+database:
+  driver: org.postgresql.Driver
+  url: jdbc:postgresql://stolon.dev.svc.cluster.local:5432/kube_camunda
+  credentialsSecretName: "camunda-bpm-credentials"
+
+
+

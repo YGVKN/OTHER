@@ -1,0 +1,161 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: camunda
+  namespace: {{ .Values.camunda_namespace }}
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: "/"
+    prometheus.io/port: "9404"
+  labels:
+    app: camunda
+    env: {{ .Values.environment }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: camunda
+  template:
+    metadata:
+      labels:
+        app: camunda
+        env: {{ .Values.environment }}
+    spec:
+      containers:
+      - image: zhuzha/app
+        name: camunda
+#        command: [ "/bin/bash" ]
+#        args: [ "-ec", "sleep 9999" ]
+        env:
+        - name: DEBUG
+          value: "true"
+
+        - name: JMX_PROMETHEUS
+          value: "true"
+
+
+        - name: DB_DRIVER
+          value: {{ .Values.database.driver }}
+
+        - name: DB_URL
+          value: {{ .Values.database.url }}
+
+        - name: DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: camunda-bpm-credentials
+              key: DB_USERNAME
+
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: camunda-bpm-credentials
+              key: DB_PASSWORD
+        - name: DB_VALIDATE_ON_BORROW
+          value: "true"
+        - name: DB_VALIDATION_QUERY
+          value: "SELECT 1"
+        - name: WAIT_FOR_TIMEOUT
+          value: "60"
+        - name: JAVA_OPTS
+          value: "-Xmx1g -XX:MaxMetaspaceSize=756m"
+          #value: "-Xdebug -Xms4g -Xmx4g -XX:MaxMetaspaceSize=1024m -Djava.net.preferIPv4Stack=false -Djava.net.preferIPv6Addresses=true"
+
+        - name: SKIP_DB_CONFIG
+          value: "true"
+
+        - name: WAIT_FOR
+          value: "stolon.{{ .Values.environment }}.svc.cluster.local:5432"
+
+        - name: KEYCLOAK_URL
+          #value: "keycloak.dev.svc.cluster.local:8443/auth"
+          value: "https://{{ .Values.environment }}.keycloak.bred.team/auth"
+
+        - name: KEYCLOAK_REALM
+          value: "BRE"
+
+        - name: KEYCLOAK_CLIENT_ID
+          value: "internal"
+
+        - name: CONSUL_ADDR
+          value: "http://consul01-office.bred.team:8500"
+
+        - name: CONSUL_PATH
+          #value: "/cfg/dev/camunda-server-config"
+          value: "/cfg/dev/camunda-kube-config"
+
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - name: bpm-platform
+          mountPath: /camunda/conf/bpm-platform.xml
+          subPath: bpm-platform.xml
+        ports:
+          - containerPort: 8080
+            name: http
+          - containerPort: 9404
+            name: metrics
+        lifecycle:
+          postStart:
+            exec:
+              command:
+                - sh
+                - "-ec"
+                - >
+                  echo "Run ... & Camunda"
+          preStop:
+            exec:
+              command:
+                - sh
+                - "-ec"
+                - >
+                  echo "Bye Camunda..."
+
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /camunda
+            port: http
+          initialDelaySeconds: 120
+          periodSeconds: 60
+          successThreshold: 1
+          timeoutSeconds: 1
+
+
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /camunda
+            port: http
+          initialDelaySeconds: 120
+          periodSeconds: 60
+          successThreshold: 1
+          timeoutSeconds: 1
+
+      restartPolicy: Always
+      volumes:
+      - name: bpm-platform
+        configMap:
+          name: bpm-platform
+
+      imagePullSecrets:
+      - name: regcred-ca-munda
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: camunda
+  namespace: {{ .Values.camunda_namespace }}
+spec:
+  selector:
+    app: camunda
+    env: {{ .Values.environment }}
+  ports:
+    - name: http
+      port: 8884
+      targetPort: 8080
+    - name: metrics
+      port: 9404
+      targetPort: 9404
+...

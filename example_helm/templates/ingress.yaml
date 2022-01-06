@@ -1,0 +1,33 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ygvkn-zhuzha-ingress
+  namespace:  {{ .Values.camunda_namespace }}
+  annotations:
+    nginx.org/proxy-connect-timeout: "30s"
+    nginx.org/proxy-read-timeout:    "20s"
+    nginx.org/client-max-body-size:  "8m"
+    nginx.ingress.kubernetes.io/affinity-mode: "balanced"
+    cert-manager.io/cluster-issuer: ygvkn-zhuzha
+    cert-manager.io/issue-temporary-certificate: "true"
+
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+      - {{ .Values.domain }}
+    secretName: {{ .Values.environment }}-camunda
+  rules:
+  - host: {{ .Values.domain }}
+    http:
+      paths:
+      - path: /camunda
+        pathType: Prefix
+        backend:
+          service:
+            name: camunda
+            port:
+              number: 8884
+
+...

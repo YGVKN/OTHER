@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bpm-platform
+  namespace: {{ .Values.camunda_namespace }}
+  labels:
+    app: camunda
+data:
+  bpm-platform.xml: |
+    <?xml version="1.0" encoding="UTF-8"?>
+
