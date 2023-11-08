@@ -1,0 +1,11 @@
+{
+  "features": {
+    "buildkit": true
+  },
+  "insecure-registries": [
+    "10.195.44.217:8081",
+    "10.195.44.217:8082"
+  ],
+  "live-restore": true
+}
+

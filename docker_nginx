@@ -1,0 +1,1 @@
+ docker run --rm -d -p 8080:8080 -p 443:443 -v $(pwd)/nginx.conf:/etc/nginx/nginx.conf -v $(pwd)/wildcard.digital.interrao.ru/wildcard.digital.interrao.ru.key:/etc/nginx/conf.d/wildcard.digital.interrao.ru.key -v $(pwd)/wildcard.digital.interrao.ru/wildcard.digital.interrao.ru.pem:/etc/nginx/conf.d/wildcard.digital.interrao.ru.pem --name nginx nginx
