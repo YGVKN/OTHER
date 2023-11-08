@@ -1,0 +1,114 @@
+plugins {
+	id 'org.springframework.boot' version '2.6.3'
+	id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+	id 'com.palantir.docker' version '0.33.0'
+	id "nebula.integtest" version "8.2.0"
+	id 'java'
+}
+
+repositories {
+	maven {
+		url 'http://zeta:9280/repository/maven-public/'
+		allowInsecureProtocol = true
+	}
+	maven {
+		url 'http://zeta:9280/repository/maven-releases/'
+		allowInsecureProtocol = true
+	}
+}
+
+group = 'ru.tii.uzdo.services'
+version = '0.1.0'
+sourceCompatibility = '1.11'
+
+configurations {
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+ext {
+	set('springCloudVersion', "2021.0.1")
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server:2.6.3'
+	implementation 'org.springframework.boot:spring-boot-starter-actuator:2.6.3'
+	implementation 'org.springframework.boot:spring-boot-starter-web:2.6.3'
+	implementation 'org.springframework.boot:spring-boot-starter-validation:2.6.3'
+	implementation 'org.springframework.cloud:spring-cloud-starter-config'
+	implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+	implementation 'org.springframework.cloud:spring-cloud-sleuth-zipkin'
+	implementation 'org.springframework.cloud:spring-cloud-starter-sleuth'
+	implementation 'org.zalando:logbook-spring-boot-starter:2.14.0'
+	implementation 'net.logstash.logback:logstash-logback-encoder:7.0.1'
+	implementation 'ru.tii:jsonGateCaller:1.0.1'
+	implementation 'ru.tii.crm.ws:crmWsClient:0.0.1'
+	implementation 'ru.tii.util:innkppvalidator:0.1.0'
+	implementation 'javax.xml.soap:javax.xml.soap-api:1.4.0'
+	implementation 'javax.mail:mail:1.4.7'
+	implementation 'javax.activation:activation:1.1.1'
+	implementation 'commons-discovery:commons-discovery:0.5'
+	implementation 'wsdl4j:wsdl4j:1.6.3'
+	implementation 'org.apache.axis:axis:1.4'
+	implementation 'org.apache.axis:axis-jaxrpc:1.4'
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test:2.6.3'
+	testImplementation 'org.springframework.security:spring-security-test'
+	testImplementation 'io.rest-assured:rest-assured'
+	testImplementation "io.rest-assured:json-path"
+}
+
+dependencyManagement {
+	imports {
+		mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+	}
+}
+
+processResources.doLast{
+    copy {
+        from layout.buildDirectory.dir("../../logback-spring.xml")
+        into layout.buildDirectory.dir("resources/main")
+    }
+}
+
+tasks.withType(Test).configureEach {
+	useJUnitPlatform()
+	outputs.upToDateWhen { false }
+}
+
+integrationTest {
+    exclude '**/**'
+}
+
+task outInfo {
+    doLast {
+        println "${project.name}"
+	println "${bootJar.archiveName}"
+    }
+}
+task someExec(type: Exec) {
+  executable "sh"
+  args "-c", "docker ps -as && docker images -a"
+}
+
+
+
+apply plugin:"com.palantir.docker"
+
+
+
+docker {
+	name "vacuum-registry.digital.interrao.ru/repository/vacuum_registry/${project.name}:newest"
+	tag 'vacuum_registry', "vacuum-registry.digital.interrao.ru/repository/vacuum_registry/${project.name}:latest"
+	dockerfile file('Dockerfile')
+	files bootJar
+	buildArgs(['JAR_FILE': "${bootJar.archiveName}"])
+	pull true
+	noCache true
+}
