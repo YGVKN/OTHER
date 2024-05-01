@@ -1,0 +1,9 @@
+GITLAB_OMNIBUS_CONFIG: |
+  external_url 'https://gitlab.example.com'
+  nginx['listen_port'] = 80
+  nginx['listen_https'] = false
+  nginx['proxy_set_headers'] = {
+    "X-Forwarded-Proto" => "https",
+    "X-Forwarded-Ssl" => "on"
+    }
+    letsencrypt['enabled'] = false
