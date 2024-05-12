@@ -1,4 +1,4 @@
 Optional >
-sudo apt install curl debian-archive-keyring tzdata lsb-release ca-certificates apt-transport-https software-properties-common -y
+sudo apt install curl wget lolcat debian-archive-keyring tzdata lsb-release ca-certificates apt-transport-https software-properties-common -y
 
-sudo certonly --webroot --webroot-path=/var/www/html --email denisyagovkin@mail.ru --agree-tos --no-eff-email -d ci.yescoin.click
+sudo certbot certonly --webroot --webroot-path=/var/www/html --email denisyagovkin@mail.ru --agree-tos --no-eff-email -d ci.yescoin.click
