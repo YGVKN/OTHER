@@ -1,0 +1,1 @@
+sudo certonly --webroot --webroot-path=/var/www/html --email denisyagovkin@mail.ru --agree-tos --no-eff-email -d ci.yescoin.click
