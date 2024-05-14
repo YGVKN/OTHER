@@ -1,0 +1,23 @@
+""func SendToTerm(what)
+""  call term_sendkeys('', a:what)
+""  return ''
+""endfunc
+""call term_sendkeys('vim-repl', "ls *.awk\<CR>")
+""call term_sendkeys('vim-repl', "\<C-c>")
+""call term_sendkeys('vim-repl', "\<C-d>")
+""call term_sendkeys('vim-repl', "echo ".@r)
+
+"vip (select paragraph)
+"“ry (copy to register r)
+":call system(“screen -S session01 -p window01 -X stuff ’” . @r . ”’”)
+
+something str - "ry - Copy to r reg
+"rp - Paste from p reg
+Value of r reg - echo @r
+
+""func Handle(channel, msg)
+""  echo 'Received: ' .. a:msg
+""endfunc
+""let ch = ch_open("127.0.0.1:5678")
+""aall ch_sendexpr(ch, 'Data', {'callback': "Handle"})
+

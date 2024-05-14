@@ -1,0 +1,9 @@
+useradd  zhuzha -m
+passwd zhuzha
+usermod --shell /bin/bash --home /home/zhuzha/ zhuzha
+chown -R zhuzha:zhuzha /home/zhuzha
+usermod -aG sudo zhuzha
+
+useradd zhuzha -s /bin/bash -m -d /home/zhuzha
+passwd zhuzha
+usermod -aG sudo zhuzha

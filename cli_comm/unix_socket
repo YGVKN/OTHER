@@ -1,0 +1,6 @@
+nc -lkU /tmp/zhuzha.sock
+echo 'Some data' | nc -U -w1 /tmp/zhuzha.sock
+echo 'Some data' | nc -U -t -w1 /tmp/zhuzha.sock
+
+while true; do nc -nvl 3456; done
+while true; do nc -nvl 3456; done > out 2>&1

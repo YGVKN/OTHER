@@ -1,0 +1,3 @@
+ln -sfn source_file linkname
+ln -snf YGVKN/vimjob vimjoblink
+ln -srnf YGVKN/maze maze_link

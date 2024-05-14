@@ -1,0 +1,2 @@
+ ssh -f -N -L :8765:localhost:5678 ovpn -l zhuzha -p 22
+ ssh -f -N -R :8765:localhost:5678 ovpn -l zhuzha -p 22

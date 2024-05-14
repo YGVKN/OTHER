@@ -1,0 +1,2 @@
+SOME_STR=$(echo "some str" | lolcat -f -t -a)
+echo $SOME_STR

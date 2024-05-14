@@ -1,0 +1,2 @@
+tar -cjvf WORK.tar.bz2 WORK compress
+tar -xjvf  WORK.tar.bz2 decompress  | tar -zjvf WORK.tar.bz2 -C /path/to/decompress/dir

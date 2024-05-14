@@ -1,0 +1,6 @@
+nohup nc -lvkU /tmp/unix.sock >> /tmp/out 2>&1 <& - & disown
+echo -ne 'And one more ...' | nc -U -t -w1 /tmp/unix.sock
+
+nc -lknv 9990
+echo 'Some data' | nc localhost 9990
+curl -fksSLZ -X POST -d 'Some Data ' 127.0.0.1:9990

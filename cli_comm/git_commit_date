@@ -1,0 +1,1 @@
+git add . && git commit -m "Update .vimrc $(date +'%Y-%m-%d %H:%M:%S')"

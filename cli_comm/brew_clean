@@ -1,0 +1,2 @@
+brew untap homebrew/core
+brew cleanup --debug --verbose

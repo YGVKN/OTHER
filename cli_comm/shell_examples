@@ -1,0 +1,42 @@
+#!//bin/zsh
+set -ueE
+trap 'echo >&2 "Error - exited with status $? at line $LINENO:";
+         pr -tn $0 | tail -n+$((LINENO - 3)) | head -n7 | lolcat -f -t -a' ERR
+         asasasasasasasasasasasas
+echo "The arguments passed in are : $@"
+# start templated
+#INSTALL_PYTHON=/opt/homebrew/opt/pre-commit/libexec/bin/python3.12
+#ARGS=(hook-impl --config=.pre-commit-config.yaml --hook-type=pre-commit)
+# end templated
+
+#HERE="$(cd "$(dirname "$0")" && pwd)"
+#ARGS+=(--hook-dir "$HERE" -- "$@")
+#
+#if [ -x "$INSTALL_PYTHON" ]; then
+#    exec "$INSTALL_PYTHON" -mpre_commit "${ARGS[@]}"
+#elif command -v pre-commit > /dev/null; then
+#    exec pre-commit "${ARGS[@]}"
+#else
+#    echo '`pre-commit` not found.  Did you forget to activate your virtualenv?' 1>&2
+#    exit 1
+#fi
+###!/usr/bin/env zsh
+if [[ ! -n $1 ]];
+then 
+    echo "No parameter passed."
+else
+    echo "Parameter passed = $1"
+fi
+
+for i in $@
+do
+        echo -e "$i\n"
+done
+
+
+#!/bin/zsh
+set -ueE
+trap 'echo >&2 "\nError - exited with status $?\r\nExit at line $LINENO"' ERR
+
+
+

@@ -1,0 +1,5 @@
+"Send out reg [r] data to named buffer [vim-repl] - call term_sendkeys('vim-repl', "echo ".@r)"
+"TMUX C-b z"
+""let @+=42
+""let @*=42
+

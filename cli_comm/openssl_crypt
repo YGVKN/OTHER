@@ -1,0 +1,2 @@
+echo "somethingpass" | openssl enc -aes-256-cbc -pbkdf2 -salt -a -in some_file -out some_file_encrypted.enc -pass pass:somesalt
+echo "somethingpass" | openssl enc -aes-256-cbc -pbkdf2 -salt -d -a -in some_file_encrypted.enc -out some_file_decrypted.dec -pass pass:somesalt

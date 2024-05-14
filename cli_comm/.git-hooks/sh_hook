@@ -1,0 +1,8 @@
+#!/bin/zsh
+set -ueE
+trap 'echo >&2 "\nError - exited with status $?\r\nExit at line $LINENO"' ERR
+#echo $@
+#echo $#
+#echo $$
+#echo $!
+echo "# sh_hook"

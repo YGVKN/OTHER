@@ -1,0 +1,19 @@
+{
+    "data-root": "/mnt/disk1/docker",
+    "storage-driver": "overlay2",
+    "insecure-registries" : [
+        "192.168.1.200:5000"
+    ],
+    "dns": [
+        "192.168.1.1"
+    ],
+    "registry-mirrors" : [
+        "http://192.168.1.200:5000"
+    ],
+    "log-driver": "json-file",
+    "log-opts": {
+        "max-size": "25m",
+        "max-file": "5",
+        "compress": "true"
+    }
+}

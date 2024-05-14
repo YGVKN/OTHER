@@ -1,0 +1,1 @@
+gpg --armor --gen-random 2 30

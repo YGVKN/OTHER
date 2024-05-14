@@ -1,0 +1,3 @@
+podman machine init zhuzha --cpus 2 --disk-size 10 --memory 2048 --rootful --username "zhuzha"
+podman machine ls
+podman start zhuzha

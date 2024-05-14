@@ -1,0 +1,42 @@
+""Server io-prepl
+""clj -J-Dclojure.server.jvm="{:name '"io-prepl"' :port 1234 :accept clojure.core.server/io-prepl :server-daemon false}"
+
+######################################
+clj -X clojure.core.server/start-server :name "new-repl" :port 8765 :accept clojure.core.server/io-prepl :bind-err true :server-daemon false
+clj -X clojure.core.server/start-server :name "new-repl" :port 8765 :accept clojure.core.server/io-prepl :bind-err true :server-daemon false &
+
+{:address "localhost" ;; host or dotted name, ipv4 or ipv6
+o:port 5555
+ :name "repl"
+ :accept clojure.main/io-prepl
+ :args []
+ :bind-err true
+ :server-daemon true
+ :client-daemon true}
+https://archive.clojure.org/design-wiki/display/design/Socket%2BServer%2BREPL.html
+
+
+
+""Connect
+
+""ssh -L :1234:localhost:1234 ucm@10.195.44.217 -p 22 -N -f
+
+""Clients
+
+""nc localhost 1234 | lolcat --force
+
+
+""Or ->
+
+""(require '[clojure.core.server :as server])
+""(server/remote-prepl "127.0.0.1" 8765 *in* println)
+
+""(require '[nrepl.core :as nrepl])
+""(with-open [conn (nrepl/connect :port 8765)]
+""     (-> (nrepl/client conn 1000)    ; message receive timeout required
+""         (nrepl/message {:op "eval" :code "(+ 2 3)"})
+""         nrepl/response-values))
+
+
+(doc read-line) ;;!!!
+;;rebel read-line

@@ -1,0 +1,12 @@
+#!/bin/zsh
+#set -ueE
+set -eExuov
+#set -o pipefail
+trap 'echo >&2 "\nError - exited with status $?\r\nExit at line $LINENO"' ERR
+ls -la | sdsds
+#echo $@
+#echo $#
+#echo $$
+#echo $!
+
+

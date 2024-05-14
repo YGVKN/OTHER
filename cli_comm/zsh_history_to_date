@@ -1,0 +1,1 @@
+for hist_file  in $(cat ~/hist_date); do date -d @$hist_file | lolcat; done

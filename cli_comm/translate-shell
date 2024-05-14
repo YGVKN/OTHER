@@ -1,0 +1,2 @@
+trans en:ru "65 days of static ..." | lolcat  -t --animate --force
+trans en:ru file://books.txt

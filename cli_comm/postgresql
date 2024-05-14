@@ -1,0 +1,2 @@
+ssh user@host "pg_dump -h 127.0.0.1 -p 5432 -U <user> -d wt -W" > /tmp/dump.sql
+pg_dump -h <ip> -p <port> -Fc -o -U <user> -d wt > /tmp/dump.sql

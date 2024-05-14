@@ -1,0 +1,1 @@
+ll ~/YGVKN/cli_comm/ | ag --hidden --heading -i -f -n shell

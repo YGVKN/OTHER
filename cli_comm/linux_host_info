@@ -1,0 +1,3 @@
+ls -la /proc/
+cat /proc/meminfo
+cat /proc/procinfo

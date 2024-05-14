@@ -1,0 +1,24 @@
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+    -   id: check-json
+        types: [json]
+        files: \.(json)$
+    -   id: check-yaml
+        args: [--allow-multiple-documents]
+    -   id: trailing-whitespace
+        exclude: |
+          (?x)^(.vimrc)$
+    -   id: check-added-large-files
+        args: ['--maxkb=1000']
+    -   id: pretty-format-json
+        args: [--autofix, --indent=2, --no-sort-keys]
+-   repo: local
+    hooks:
+    -   id: sh_hook
+        name: sh_hook
+        entry: .git-hooks/sh_hook
+        description: Custom shell hook
+        language: script
+        pass_filenames: false

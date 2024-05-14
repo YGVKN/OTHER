@@ -1,0 +1,48 @@
+"help!
+"help 42
+"help quotes
+"help holy-grail
+":smile"
+
+"Runnig & profiling"
+"vim --cmd 'profile start profile.log' --cmd 'profile func *' --cmd 'profile file *' -c 'profdel func *' -c 'profdel file *' -c 'qa!'"
+"vim run as cli command with args - vim -Nu NONE -c <args>"
+"vim -U NONE -X -Z -e -s -S poc -c qa"
+"vim -c 'profile start vim.log' -c 'profile func *' -c 'q' - profiling by all funcs & time execution"
+
+"https://learnvimscriptthehardway.stevelosh.com/"
+"ps x -o user,pid,rss,comm | awk 'NR>1 {$3=int($3/1024)"Mb";}{ print ;}' | grep -i iterm | sort -k 3 -n"
+"q: & q/"
+".vim/autoload/stuff.vim - call stuff#Some_fn"
+"nc -v -z -w 3 waww.io 443 &> /dev/null && echo "Port 443 [tcp/https] - OPEN" || echo "CLOSE" "
+"curl wttr.in/Moscow"
+"Get IP   curl icanhazip.com"
+"get IP https://api.ipify.org/"
+"Get info by IP  curl -sSL https://ipinfo.io/87.249.25.6 | jq '.ip,.hostname,.city,.region,.country,.loc,.org,.timezone' "
+"example | curl -sSL "https://ipinfo.io/$(curl icanhazip.com)" | jq -C "'.ip,.hostname,.city,.region,.country,.loc,.org,.timezone' |"
+"example | curl -# "https://ipinfo.io/$(curl icanhazip.com)" | jq -C "'.ip,.hostname,.city,.region,.country,.loc,.org,.timezone' |"
+"Scanning ports nc -z -n -v -w 3 31.31.196.139  1-1000>nc.out 2>&1  "
+"https://foragoodstrftime.com/ Date format"
+
+""gfind -O3 -L  ./Downloads  -maxdepth 5  -type f -iname '*.pdf' -size -222k -ctime -10  | lolcat
+ set grepprg=rg\ --vimgrep\ --color=always\ --no-hidden\ --no-heading\ -Lin\ -j$(nproc)
+  :vimgrep some path/to/file | copen
+:bufdo %bwipeout | q
+
+
+""command! -nargs=1 FF let i=1
+""      \|let mm=findfile(<q-args>, '.;', -1)|for f in mm| echo i.':'.f|let i+=1|endfor
+""      \|let choice=input('FF: ')|exec 'e ' . mm[choice-1]"
+
+"":enew | .! <command>
+""curl  -fsSLZ https://raw.githubusercontent.com/ygvkn/vim/master/.vimrc -o .vimrc
+""ruby -e "$(curl -fsSLZ raw.githubusercontent.com/ygvkn/vim/master/bash-colors-256)"
+"":bufdo vimgrepadd threading % | copen
+""cowsay -W 50 -f dragon  $(date) | lolcat -t --animate --speed=30.0 --duration=30 --freq=0.4 --spread=1.0
+"":bufdo vimgrepadd threading % | copen
+
+"Shift ? - <search something>"
+"Send out reg [r] data to named buffer [vim-repl] - call term_sendkeys('vim-repl', "echo ".@r)"
+"TMUX C-b z"
+""let @+=42
+""let @*=42
