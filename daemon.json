@@ -23,5 +23,6 @@
     "max-file": "5",
     "compress": "true"
   },
-  "live-restore": true
+  "live-restore": true,
+  "experimental": true
 }

@@ -1,0 +1,1 @@
+apt install  silversearcher-ag moreutils curl wget lolcat cowsay btop debian-archive-keyring tzdata lsb-release ca-certificates apt-transport-https software-properties-common -y
