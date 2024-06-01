@@ -1,0 +1,1 @@
+nohup npm run start >> service.log 2>&1 <&- & disown

@@ -1,0 +1,26 @@
+.compile:
+  script:
+    - echo -e "\e[31mRUN ...\e[0m & ... \e[31m  compile..."
+    - apt update && apt install curl figlet toilet ruby jq build-essential -qqy > /dev/null 2>&1
+    - go env GOPATH
+    - env | grep WHAT
+    - mkdir  -p StateStore
+    - figlet -w 100 -c bred.team
+    - ruby -ryaml -rjson -e "puts YAML.load_file('versions.yml').to_json" > $CI_PROJECT_DIR/versions.json && cat $CI_PROJECT_DIR/versions.json | jq -C
+      #- "(go mod tidy && go mod verify) > /dev/null 2>&1"
+    - "(go mod tidy) > /dev/null 2>&1"
+    - echo -e "\e[33mCompile..."
+    - go install -ldflags="-s -w -X main.env-stand=$WHAT_IS_STAND -X main.gitCommit=$CI_COMMIT_SHORT_SHA -X main.gitBranch=$CI_COMMIT_BRANCH" ./...
+    - cp -R $GOPATH/bin/* $CI_PROJECT_DIR/StateStore
+    - export APPS_COUT=$(ls -al $CI_PROJECT_DIR/StateStore | wc -l)
+    - ls -al StateStore && du -sh StateStore && echo $APPS_COUT
+    - echo -e "\e[33mCurrent list images & tags..."
+      #    - |
+      #      curl -H "PRIVATE-TOKEN: $YGVKN" "https://gitlab.bred.team/api/v4/projects/24/registry/repositories?tags=true&tags_count=true" | jq -C;
+#    - |
+#      for app in $(cat $CI_PROJECT_DIR/StateStore/versions.json | jq '.apps | keys')
+#      do
+#        echo -e "\e[33m$app"
+#      done
+  allow_failure: true
+
