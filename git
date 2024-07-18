@@ -1,2 +1,4 @@
 git push origin --delete <branch>
 git branch --delete <branch>
+git ls-tree -r --name-only main | grep -Lin socket
+git log --all -- 'nginx.conf'

@@ -1,0 +1,4 @@
+openssl genrsa -out base_key.pem 4096
+openssl rsa -in base_key.pem -outform PEM -pubout -out base_key.pem.pub
+openssl rsautl -encrypt -inkey base_key.pem.pub -pubin -in somefile -out somefile.enc
+openssl rsautl -decrypt -inkey base_key.pem -in somefile.enc  -out somefile.dec
