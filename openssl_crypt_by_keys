@@ -1,4 +1,9 @@
 openssl genrsa -out base_key.pem 4096
 openssl rsa -in base_key.pem -outform PEM -pubout -out base_key.pem.pub
-openssl rsautl -encrypt -inkey base_key.pem.pub -pubin -in somefile -out somefile.enc
-openssl rsautl -decrypt -inkey base_key.pem -in somefile.enc  -out somefile.dec
+openssl rand -base64 256 > symmetric_keyfile.key
+
+openssl rsautl -encrypt -inkey base_key.pem.pub -pubin -in ./symmetric_keyfile.key -out ./symmetric_keyfile.key.enc
+openssl rsautl -decrypt -inkey ./base_key.pem -in ./symmetric_keyfile.key.enc  -out ./symmetric_keyfile.key.dec
+
+openssl enc -aes-256-cbc -salt -in ./largefile -out ./largefile.enc -pass file:./symmetric_keyfile.key
+openssl enc -d -aes-256-cbc -in ./largefile.enc -out ./largefile.dec -pass file:./symmetric_keyfile.key
