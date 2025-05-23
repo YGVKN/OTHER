@@ -1,0 +1,1 @@
+nohup clj -X:socket-repl >> out 2>&1 <&- & disown

@@ -1,0 +1,1 @@
+["^ ","~$sum",["^ ","~:row",3,"~:col",1,"~:fixed-arities",["~#set",[2]],"~:name","^0","~:ns","~$sample.sum","~:top-ns","^7","~:arities",["^ ","~i2",["^ ","~:ret","~:nilable/int","~:args",["~#list",["^;","^;"]],"~:arglist-str","[a b]"]],"~:type","~:fn"],"~:filename","/Users/ygvkn/Downloads/clojure_cli/clj-cli-build/src/sample/sum.clj"]

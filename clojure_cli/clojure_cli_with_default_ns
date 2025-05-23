@@ -1,0 +1,2 @@
+clj -M:build -i build.clj -e "(in-ns 'build)" -r
+clj -M -e "(require,'current.your-ns)(in-ns,'current.your-ns)" --repl
