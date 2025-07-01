@@ -1,3 +1,1 @@
-Optional >
-apt install moreutils curl wget lolcat cowsay btop debian-archive-keyring tzdata lsb-release ca-certificates apt-transport-https software-properties-common -yqq
-certbot certonly --webroot --webroot-path=/var/www/html --email denisyagovkin@mail.ru --agree-tos --no-eff-email -d ci.yescoin.click
+certbot certonly --webroot --webroot-path=/var/www/zhuzhacorp.org --email denisyagovkin@mail.ru --agree-tos --no-eff-email -d zhuzhacorp.org
